@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CTI Hub — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0a; --surface: #111111; --surface2: #161616; --border: #1e1e1e; --border2: #2a2a2a;
+    --accent: #00d4ff; --accent-d: #0099bb; --error: #ff4444; --warn: #ffaa00; --success: #00cc66;
+    --text: #e0e0e0; --text-dim: #555555; --text-mid: #888888;
+    --mono: 'IBM Plex Mono', monospace; --sans: 'IBM Plex Sans', sans-serif;
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+
+  /* Layout */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 220px; flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    position: fixed; top: 0; left: 0; height: 100vh;
+    z-index: 10;
+  }
+  .sidebar-logo {
+    padding: 1.25rem 1.25rem 1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-mark {
+    width: 28px; height: 28px;
+    border: 1.5px solid var(--accent);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .logo-mark svg { width: 12px; height: 12px; fill: var(--accent); }
+  .logo-name { font-family: var(--mono); font-size: 0.82rem; font-weight: 500; letter-spacing: 0.12em; color: var(--text); }
+  .logo-role { font-family: var(--mono); font-size: 0.6rem; color: var(--text-dim); letter-spacing: 0.1em; margin-top: 1px; }
+
+  .nav { padding: 1rem 0; flex: 1; }
+  .nav-section { font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.2em; color: var(--text-dim); padding: 0 1.25rem; margin: 1rem 0 0.5rem; text-transform: uppercase; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0.55rem 1.25rem;
+    font-family: var(--mono); font-size: 0.75rem;
+    color: var(--text-mid); cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+    border-left: 2px solid transparent;
+    text-decoration: none;
+  }
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(0,212,255,0.05); }
+  .nav-item .icon { font-size: 0.85rem; width: 16px; text-align: center; }
+
+  .sidebar-footer {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono); font-size: 0.68rem; color: var(--text-dim);
+  }
+  .sidebar-footer a { color: var(--text-dim); text-decoration: none; display: block; padding: 0.3rem 0; transition: color 0.15s; }
+  .sidebar-footer a:hover { color: var(--text); }
+
+  /* Main */
+  .main { margin-left: 220px; flex: 1; padding: 2rem; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* Page header */
+  .page-header { margin-bottom: 2rem; }
+  .page-title { font-size: 1.1rem; font-weight: 600; color: var(--text); margin-bottom: 0.25rem; }
+  .page-desc { font-size: 0.82rem; color: var(--text-mid); }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); margin-bottom: 1.5rem; }
+  .card-header {
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-title { font-family: var(--mono); font-size: 0.7rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-mid); }
+  .card-body { padding: 1.25rem; }
+
+  /* Engine table */
+  .engine-table { width: 100%; border-collapse: collapse; }
+  .engine-table th {
+    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-dim); padding: 0 0.75rem 0.75rem; text-align: left; font-weight: 500;
+  }
+  .engine-table td { padding: 0.85rem 0.75rem; border-top: 1px solid var(--border); vertical-align: middle; }
+  .engine-table tr:hover td { background: rgba(255,255,255,0.015); }
+
+  .engine-name { display: flex; align-items: center; gap: 10px; }
+  .engine-icon { font-size: 1rem; width: 22px; text-align: center; }
+  .engine-label { font-weight: 500; font-size: 0.85rem; }
+  .engine-free { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); margin-top: 2px; }
+
+  .tag { font-family: var(--mono); font-size: 0.6rem; padding: 2px 6px; border: 1px solid var(--border2); color: var(--text-dim); margin-right: 3px; display: inline-block; }
+  .tag.hash { border-color: #334; color: #88a; }
+  .tag.ip   { border-color: #343; color: #8a8; }
+  .tag.url  { border-color: #443; color: #aa8; }
+
+  /* Toggle switch */
+  .toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; inset: 0;
+    background: var(--border2); cursor: pointer;
+    transition: background 0.2s;
+  }
+  .slider::before {
+    content: ''; position: absolute;
+    height: 14px; width: 14px;
+    left: 3px; bottom: 3px;
+    background: var(--text-dim);
+    transition: transform 0.2s, background 0.2s;
+  }
+  input:checked + .slider { background: rgba(0,212,255,0.2); }
+  input:checked + .slider::before { transform: translateX(16px); background: var(--accent); }
+
+  /* Key field */
+  .key-row { display: flex; gap: 6px; align-items: center; }
+  .key-input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border2);
+    padding: 0.45rem 0.65rem; color: var(--text);
+    font-family: var(--mono); font-size: 0.75rem; outline: none;
+    transition: border-color 0.15s; min-width: 0;
+  }
+  .key-input:focus { border-color: var(--accent); }
+  .key-input::placeholder { color: var(--text-dim); }
+
+  /* Buttons */
+  .btn { padding: 0.45rem 0.85rem; border: none; cursor: pointer; font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; transition: all 0.15s; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: var(--accent-d); }
+  .btn-ghost { background: transparent; border: 1px solid var(--border2); color: var(--text-mid); }
+  .btn-ghost:hover { border-color: var(--text-mid); color: var(--text); }
+  .btn-danger { background: transparent; border: 1px solid rgba(255,68,68,0.3); color: var(--error); }
+  .btn-danger:hover { background: rgba(255,68,68,0.1); }
+  .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.62rem; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Status badge */
+  .badge { font-family: var(--mono); font-size: 0.62rem; padding: 2px 8px; letter-spacing: 0.08em; }
+  .badge-ok  { color: var(--success); border: 1px solid rgba(0,204,102,0.3); background: rgba(0,204,102,0.07); }
+  .badge-err { color: var(--error);   border: 1px solid rgba(255,68,68,0.3); background: rgba(255,68,68,0.07); }
+  .badge-warn{ color: var(--warn);    border: 1px solid rgba(255,170,0,0.3); background: rgba(255,170,0,0.07); }
+  .badge-off { color: var(--text-dim);border: 1px solid var(--border2); }
+
+  /* Form */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .form-field { display: flex; flex-direction: column; gap: 0.4rem; }
+  .form-field.full { grid-column: 1/-1; }
+  .form-label { font-family: var(--mono); font-size: 0.68rem; color: var(--text-mid); letter-spacing: 0.06em; }
+  .form-input { background: var(--bg); border: 1px solid var(--border2); padding: 0.6rem 0.75rem; color: var(--text); font-family: var(--mono); font-size: 0.8rem; outline: none; transition: border-color 0.15s; }
+  .form-input:focus { border-color: var(--accent); }
+  .form-hint { font-family: var(--mono); font-size: 0.62rem; color: var(--text-dim); }
+
+  /* Users table */
+  .user-row { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0; border-top: 1px solid var(--border); }
+  .user-avatar { width: 30px; height: 30px; background: var(--border2); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 0.72rem; color: var(--text-mid); flex-shrink: 0; }
+  .user-info { flex: 1; }
+  .user-name { font-weight: 500; font-size: 0.85rem; }
+  .user-meta { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); margin-top: 2px; }
+  .role-badge { font-family: var(--mono); font-size: 0.6rem; padding: 2px 7px; }
+  .role-admin  { color: var(--accent); border: 1px solid rgba(0,212,255,0.3); background: rgba(0,212,255,0.07); }
+  .role-analyst{ color: var(--success); border: 1px solid rgba(0,204,102,0.3); background: rgba(0,204,102,0.07); }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 1.5rem; right: 1.5rem;
+    background: var(--surface2); border: 1px solid var(--border2);
+    padding: 0.7rem 1rem; font-family: var(--mono); font-size: 0.72rem;
+    z-index: 999; opacity: 0; transform: translateY(6px);
+    transition: all 0.2s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.ok  { border-color: var(--success); color: var(--success); }
+  #toast.err { border-color: var(--error);   color: var(--error); }
+
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border2); padding: 1.75rem; width: 100%; max-width: 420px; }
+  .modal-title { font-family: var(--mono); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.1em; margin-bottom: 1.25rem; color: var(--text); }
+  .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.25rem; }
+
+  /* Section divider */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+
+  /* CAPA path row */
+  .capa-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+
+  @media (max-width: 768px) {
+    .sidebar { width: 100%; height: auto; position: relative; }
+    .main { margin-left: 0; }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 16 16"><path d="M8 1L14 4.5V11.5L8 15L2 11.5V4.5L8 1Z"/></svg>
+      </div>
+      <div>
+        <div class="logo-name">CTI HUB</div>
+        <div class="logo-role">Admin Panel</div>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-section">Management</div>
+      <div class="nav-item active" onclick="showPage('engines')" id="nav-engines">
+        <span class="icon">⚙</span> API Engines
+      </div>
+      <div class="nav-item" onclick="showPage('users')" id="nav-users">
+        <span class="icon">👤</span> Users
+      </div>
+
+      <div class="nav-section">Integrations</div>
+      <div class="nav-item" onclick="showPage('capa')" id="nav-capa">
+        <span class="icon">🍓</span> CAPA
+      </div>
+      <div class="nav-item" onclick="showPage('elastic')" id="nav-elastic">
+        <span class="icon">📊</span> Elasticsearch
+      </div>
+
+      <div class="nav-section">System</div>
+      <div class="nav-item" onclick="showPage('settings')" id="nav-settings">
+        <span class="icon">⚡</span> Settings
+      </div>
+      <a class="nav-item" href="/">
+        <span class="icon">←</span> Back to Lab
+      </a>
+    </div>
+
+    <div class="sidebar-footer">
+      <span id="sidebarUser" style="color:var(--text-mid)"></span><br>
+      <a href="#" onclick="logout()">Sign out</a>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- ── ENGINES PAGE ── -->
+    <div class="page active" id="page-engines">
+      <div class="page-header">
+        <div class="page-title">API Engine Management</div>
+        <div class="page-desc">Configure CTI engines, API keys, and enable/disable sources. Keys are stored server-side and never sent to the browser.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Configured Engines</span>
+          <button class="btn btn-primary btn-sm" onclick="showAddEngine()">+ Add Engine</button>
+        </div>
+        <div class="card-body" style="padding:0">
+          <table class="engine-table">
+            <thead>
+              <tr>
+                <th style="padding-left:1.25rem">Engine</th>
+                <th>Supports</th>
+                <th>API Key</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="enginesTableBody">
+              <tr><td colspan="5" style="padding:1.5rem;text-align:center;color:var(--text-dim);font-family:var(--mono);font-size:0.75rem">Loading engines...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── USERS PAGE ── -->
+    <div class="page" id="page-users">
+      <div class="page-header">
+        <div class="page-title">User Management</div>
+        <div class="page-desc">Manage analyst accounts. Admins have full access including this panel.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Create New User</span>
+        </div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="form-label">Username</label>
+              <input class="form-input" type="text" id="newUsername" placeholder="analyst01" autocapitalize="none">
+            </div>
+            <div class="form-field">
+              <label class="form-label">Role</label>
+              <select class="form-input" id="newRole">
+                <option value="analyst">Analyst</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="form-label">Password</label>
+              <input class="form-input" type="password" id="newPassword" placeholder="Min 8 characters">
+            </div>
+            <div class="form-field">
+              <label class="form-label">Confirm Password</label>
+              <input class="form-input" type="password" id="newPasswordConfirm" placeholder="Repeat password">
+            </div>
+          </div>
+          <div style="margin-top:1rem">
+            <button class="btn btn-primary" onclick="createUser()">Create User</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Existing Users</span></div>
+        <div class="card-body" id="usersListBody">
+          <div style="color:var(--text-dim);font-family:var(--mono);font-size:0.75rem">Loading users...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CAPA PAGE ── -->
+    <div class="page" id="page-capa">
+      <div class="page-header">
+        <div class="page-title">CAPA Integration</div>
+        <div class="page-desc">CAPA performs static malware analysis and maps capabilities to MITRE ATT&CK. Install the binary then configure below.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Installation</span></div>
+        <div class="card-body">
+          <p style="font-size:0.82rem;color:var(--text-mid);margin-bottom:1rem">Install CAPA from the official Mandiant repository:</p>
+          <div style="background:var(--bg);border:1px solid var(--border2);padding:0.75rem 1rem;font-family:var(--mono);font-size:0.75rem;color:var(--text-mid);margin-bottom:0.75rem">
+            # Linux ARM64 (Raspberry Pi)<br>
+            wget https://github.com/mandiant/capa/releases/latest/download/capa-linux-arm64<br>
+            chmod +x capa-linux-arm64 && sudo mv capa-linux-arm64 /usr/local/bin/capa<br><br>
+            # Linux x86_64<br>
+            wget https://github.com/mandiant/capa/releases/latest/download/capa-linux<br>
+            chmod +x capa-linux && sudo mv capa-linux /usr/local/bin/capa
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Configuration</span></div>
+        <div class="card-body">
+          <div class="form-field" style="margin-bottom:1rem">
+            <label class="form-label">Enable CAPA</label>
+            <label class="toggle" style="margin-top:0.25rem">
+              <input type="checkbox" id="capaEnabled" onchange="saveCapaConfig()">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="form-field" style="margin-bottom:1rem">
+            <label class="form-label">CAPA Binary Path</label>
+            <div class="capa-row">
+              <input class="form-input" type="text" id="capaBinaryPath" placeholder="/usr/local/bin/capa" style="flex:1;min-width:0">
+              <button class="btn btn-ghost" onclick="testCapa()">Test Connection</button>
+              <button class="btn btn-primary" onclick="saveCapaConfig()">Save</button>
+            </div>
+            <div class="form-hint" style="margin-top:0.4rem">Full path to the CAPA binary on this system</div>
+          </div>
+
+          <div id="capaTestResult" style="margin-top:0.75rem;font-family:var(--mono);font-size:0.72rem;display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ELASTICSEARCH PAGE ── -->
+    <div class="page" id="page-elastic">
+      <div class="page-header">
+        <div class="page-title">Elasticsearch Integration</div>
+        <div class="page-desc">Automatically ship scan results to Elasticsearch for Kibana dashboards and SIEM correlation.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Connection Settings</span></div>
+        <div class="card-body">
+          <div class="form-field" style="margin-bottom:1.25rem">
+            <label class="form-label">Enable Elasticsearch Shipping</label>
+            <label class="toggle" style="margin-top:0.25rem">
+              <input type="checkbox" id="esEnabled">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-field full">
+              <label class="form-label">Elasticsearch URL</label>
+              <input class="form-input" type="text" id="esUrl" placeholder="https://localhost:9200">
+            </div>
+            <div class="form-field">
+              <label class="form-label">Username</label>
+              <input class="form-input" type="text" id="esUsername" placeholder="elastic">
+            </div>
+            <div class="form-field">
+              <label class="form-label">Password</label>
+              <input class="form-input" type="password" id="esPassword" placeholder="Leave blank to keep existing">
+            </div>
+            <div class="form-field">
+              <label class="form-label">Index Name</label>
+              <input class="form-input" type="text" id="esIndex" placeholder="cti-scans">
+            </div>
+            <div class="form-field" style="align-self:end">
+              <label class="form-label">Verify SSL</label>
+              <label class="toggle" style="margin-top:0.3rem">
+                <input type="checkbox" id="esVerifySSL">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div style="margin-top:1.25rem;display:flex;gap:0.5rem">
+            <button class="btn btn-primary" onclick="saveElasticConfig()">Save Configuration</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS PAGE ── -->
+    <div class="page" id="page-settings">
+      <div class="page-header">
+        <div class="page-title">System Settings</div>
+        <div class="page-desc">General configuration for CTI Hub.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">General</span></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="form-label">Application Name</label>
+              <input class="form-input" type="text" id="appName" placeholder="CTI Hub">
+            </div>
+            <div class="form-field">
+              <label class="form-label">Session Timeout (minutes)</label>
+              <input class="form-input" type="number" id="sessionTimeout" placeholder="480" min="15" max="1440">
+            </div>
+          </div>
+          <div style="margin-top:1.25rem">
+            <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">System Info</span></div>
+        <div class="card-body" id="systemInfo">
+          <div style="color:var(--text-dim);font-family:var(--mono);font-size:0.75rem">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Add Engine Modal -->
+<div class="modal-overlay" id="addEngineModal">
+  <div class="modal">
+    <div class="modal-title">Add CTI Engine</div>
+    <div class="form-grid" style="gap:0.75rem">
+      <div class="form-field">
+        <label class="form-label">Engine ID (unique, no spaces)</label>
+        <input class="form-input" type="text" id="newEngineId" placeholder="my_engine">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Display Name</label>
+        <input class="form-input" type="text" id="newEngineName" placeholder="My CTI Engine">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Icon (emoji)</label>
+        <input class="form-input" type="text" id="newEngineIcon" placeholder="🔌" maxlength="2">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Free Tier Info</label>
+        <input class="form-input" type="text" id="newEngineFree" placeholder="100 req/day">
+      </div>
+      <div class="form-field full">
+        <label class="form-label">API Key</label>
+        <input class="form-input" type="password" id="newEngineKey" placeholder="Optional — can add later">
+      </div>
+      <div class="form-field full">
+        <label class="form-label">Docs URL</label>
+        <input class="form-input" type="text" id="newEngineDocs" placeholder="https://...">
+      </div>
+      <div class="form-field full">
+        <label class="form-label">Supports (check all that apply)</label>
+        <div style="display:flex;gap:1rem;margin-top:0.25rem">
+          <label style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:0.72rem;color:var(--text-mid);cursor:pointer">
+            <input type="checkbox" id="supHash" value="hash"> Hash
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:0.72rem;color:var(--text-mid);cursor:pointer">
+            <input type="checkbox" id="supIp" value="ip"> IP
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:0.72rem;color:var(--text-mid);cursor:pointer">
+            <input type="checkbox" id="supUrl" value="url"> URL
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:0.72rem;color:var(--text-mid);cursor:pointer">
+            <input type="checkbox" id="supDomain" value="domain"> Domain
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('addEngineModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addEngine()">Add Engine</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Key Modal -->
+<div class="modal-overlay" id="editKeyModal">
+  <div class="modal">
+    <div class="modal-title" id="editKeyTitle">Update API Key</div>
+    <input type="hidden" id="editKeyEngineId">
+    <div class="form-field" style="margin-bottom:1rem">
+      <label class="form-label">API Key</label>
+      <input class="form-input" type="password" id="editKeyValue" placeholder="Paste your API key here">
+    </div>
+    <div class="form-hint" style="margin-bottom:1rem">Keys are stored securely on the server and never sent to the browser.</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('editKeyModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveKey()">Save Key</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const TOKEN = localStorage.getItem('cti_token');
+if (!TOKEN) window.location.href = '/login';
+
+const headers = { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
+
+// Auth check
+fetch('/api/auth/me', { headers })
+  .then(r => { if (!r.ok) window.location.href = '/login'; return r.json(); })
+  .then(u => {
+    if (u.role !== 'admin') { alert('Admin access required'); window.location.href = '/'; }
+    document.getElementById('sidebarUser').textContent = u.username;
+  });
+
+// ── Navigation ──
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+
+  if (name === 'engines')  loadEngines();
+  if (name === 'users')    loadUsers();
+  if (name === 'capa')     loadCapaConfig();
+  if (name === 'elastic')  loadElasticConfig();
+  if (name === 'settings') loadSettings();
+}
+
+// ── Toast ──
+let toastTimer;
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = '', 3000);
+}
+
+// ── Modal ──
+function showModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ═══════════════════════════════════════════════
+// ENGINES
+// ═══════════════════════════════════════════════
+async function loadEngines() {
+  const r = await fetch('/api/engines', { headers });
+  const engines = await r.json();
+  renderEngines(engines);
+}
+
+function renderEngines(engines) {
+  const tbody = document.getElementById('enginesTableBody');
+  if (!engines.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:1.5rem;text-align:center;color:var(--text-dim);font-family:var(--mono);font-size:0.75rem">No engines configured</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = engines.map(e => {
+    const supports = (e.supports || []).map(s => `<span class="tag ${s}">${s}</span>`).join('');
+    const keyStatus = e.has_key
+      ? '<span class="badge badge-ok">Key set</span>'
+      : '<span class="badge badge-warn">No key</span>';
+    const statusBadge = e.enabled
+      ? '<span class="badge badge-ok">Enabled</span>'
+      : '<span class="badge badge-off">Disabled</span>';
+
+    const deleteBtn = e.custom
+      ? `<button class="btn btn-danger btn-sm" onclick="deleteEngine('${e.id}')">Delete</button>`
+      : '';
+
+    return `
+      <tr>
+        <td style="padding-left:1.25rem">
+          <div class="engine-name">
+            <span class="engine-icon">${e.icon || '🔌'}</span>
+            <div>
+              <div class="engine-label">${e.name}</div>
+              <div class="engine-free">${e.free_tier || ''}</div>
+            </div>
+          </div>
+        </td>
+        <td>${supports}</td>
+        <td>${keyStatus}</td>
+        <td>
+          <label class="toggle">
+            <input type="checkbox" ${e.enabled ? 'checked' : ''} onchange="toggleEngine('${e.id}', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </td>
+        <td>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" onclick="openEditKey('${e.id}', '${e.name}')">Edit Key</button>
+            <button class="btn btn-ghost btn-sm" onclick="testEngine('${e.id}')">Test</button>
+            ${deleteBtn}
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+async function toggleEngine(id, enabled) {
+  await fetch(`/api/engines/${id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ enabled })
+  });
+  toast(`Engine ${enabled ? 'enabled' : 'disabled'}`);
+}
+
+function openEditKey(id, name) {
+  document.getElementById('editKeyEngineId').value = id;
+  document.getElementById('editKeyTitle').textContent = `Update Key — ${name}`;
+  document.getElementById('editKeyValue').value = '';
+  showModal('editKeyModal');
+}
+
+async function saveKey() {
+  const id  = document.getElementById('editKeyEngineId').value;
+  const key = document.getElementById('editKeyValue').value.trim();
+  if (!key) { toast('Please enter an API key', 'err'); return; }
+
+  const r = await fetch(`/api/engines/${id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ api_key: key })
+  });
+  if (r.ok) {
+    closeModal('editKeyModal');
+    toast('API key saved');
+    loadEngines();
+  } else {
+    toast('Failed to save key', 'err');
+  }
+}
+
+async function testEngine(id) {
+  toast('Testing connection...');
+  const r    = await fetch(`/api/engines/${id}/test`, { method: 'POST', headers });
+  const data = await r.json();
+  if (data.status === 'ok') toast(`✓ ${data.message}`);
+  else toast(`✗ ${data.message}`, 'err');
+}
+
+function showAddEngine() { showModal('addEngineModal'); }
+
+async function addEngine() {
+  const supports = [];
+  if (document.getElementById('supHash').checked)   supports.push('hash');
+  if (document.getElementById('supIp').checked)     supports.push('ip');
+  if (document.getElementById('supUrl').checked)    supports.push('url');
+  if (document.getElementById('supDomain').checked) supports.push('domain');
+
+  const payload = {
+    id:        document.getElementById('newEngineId').value.trim().replace(/\s+/g,'_').toLowerCase(),
+    name:      document.getElementById('newEngineName').value.trim(),
+    icon:      document.getElementById('newEngineIcon').value.trim() || '🔌',
+    free_tier: document.getElementById('newEngineFree').value.trim(),
+    api_key:   document.getElementById('newEngineKey').value.trim(),
+    docs_url:  document.getElementById('newEngineDocs').value.trim(),
+    supports,
+  };
+
+  if (!payload.id || !payload.name || !supports.length) {
+    toast('ID, name, and at least one supported type required', 'err');
+    return;
+  }
+
+  const r = await fetch('/api/engines', { method: 'POST', headers, body: JSON.stringify(payload) });
+  if (r.ok) {
+    closeModal('addEngineModal');
+    toast('Engine added');
+    loadEngines();
+  } else {
+    const d = await r.json();
+    toast(d.error || 'Failed to add engine', 'err');
+  }
+}
+
+async function deleteEngine(id) {
+  if (!confirm('Delete this engine? This cannot be undone.')) return;
+  const r = await fetch(`/api/engines/${id}`, { method: 'DELETE', headers });
+  if (r.ok) { toast('Engine deleted'); loadEngines(); }
+  else { const d = await r.json(); toast(d.error || 'Failed', 'err'); }
+}
+
+// ═══════════════════════════════════════════════
+// USERS
+// ═══════════════════════════════════════════════
+async function loadUsers() {
+  const r     = await fetch('/api/users', { headers });
+  const users = await r.json();
+  const me    = localStorage.getItem('cti_username');
+
+  const body = document.getElementById('usersListBody');
+  if (!users.length) { body.innerHTML = '<div style="color:var(--text-dim);font-family:var(--mono);font-size:0.75rem">No users found</div>'; return; }
+
+  body.innerHTML = users.map(u => `
+    <div class="user-row">
+      <div class="user-avatar">${u.username[0].toUpperCase()}</div>
+      <div class="user-info">
+        <div class="user-name">${u.username} ${u.username === me ? '<span style="color:var(--text-dim);font-size:0.72rem">(you)</span>' : ''}</div>
+        <div class="user-meta">Created ${u.created ? new Date(u.created).toLocaleDateString() : 'Unknown'}</div>
+      </div>
+      <span class="role-badge role-${u.role}">${u.role}</span>
+      ${u.username !== me ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.username}')">Remove</button>` : ''}
+    </div>`).join('');
+}
+
+async function createUser() {
+  const username = document.getElementById('newUsername').value.trim();
+  const password = document.getElementById('newPassword').value;
+  const confirm  = document.getElementById('newPasswordConfirm').value;
+  const role     = document.getElementById('newRole').value;
+
+  if (!username || !password) { toast('Username and password required', 'err'); return; }
+  if (password !== confirm)   { toast('Passwords do not match', 'err'); return; }
+  if (password.length < 8)    { toast('Password must be at least 8 characters', 'err'); return; }
+
+  const r = await fetch('/api/users', { method: 'POST', headers, body: JSON.stringify({ username, password, role }) });
+  const d = await r.json();
+  if (r.ok) {
+    toast(`User "${username}" created`);
+    document.getElementById('newUsername').value = '';
+    document.getElementById('newPassword').value = '';
+    document.getElementById('newPasswordConfirm').value = '';
+    loadUsers();
+  } else {
+    toast(d.error || 'Failed to create user', 'err');
+  }
+}
+
+async function deleteUser(username) {
+  if (!confirm(`Remove user "${username}"? They will be logged out immediately.`)) return;
+  const r = await fetch(`/api/users/${username}`, { method: 'DELETE', headers });
+  if (r.ok) { toast('User removed'); loadUsers(); }
+  else { const d = await r.json(); toast(d.error || 'Failed', 'err'); }
+}
+
+// ═══════════════════════════════════════════════
+// CAPA
+// ═══════════════════════════════════════════════
+async function loadCapaConfig() {
+  const r   = await fetch('/api/capa/config', { headers });
+  const cfg = await r.json();
+  document.getElementById('capaEnabled').checked    = cfg.enabled || false;
+  document.getElementById('capaBinaryPath').value   = cfg.binary_path || '/usr/local/bin/capa';
+}
+
+async function saveCapaConfig() {
+  const enabled     = document.getElementById('capaEnabled').checked;
+  const binary_path = document.getElementById('capaBinaryPath').value.trim();
+  const r = await fetch('/api/capa/config', { method: 'PUT', headers, body: JSON.stringify({ enabled, binary_path }) });
+  if (r.ok) toast('CAPA configuration saved');
+  else toast('Failed to save', 'err');
+}
+
+async function testCapa() {
+  const result = document.getElementById('capaTestResult');
+  result.style.display = 'block';
+  result.style.color   = 'var(--text-mid)';
+  result.textContent   = 'Testing...';
+
+  const r    = await fetch('/api/capa/test', { method: 'POST', headers });
+  const data = await r.json();
+
+  if (data.status === 'ok') {
+    result.style.color = 'var(--success)';
+    result.textContent = `✓ CAPA found: ${data.version}`;
+  } else {
+    result.style.color = 'var(--error)';
+    result.textContent = `✗ ${data.message}`;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// ELASTICSEARCH
+// ═══════════════════════════════════════════════
+async function loadElasticConfig() {
+  const r   = await fetch('/api/elastic/config', { headers });
+  const cfg = await r.json();
+  document.getElementById('esEnabled').checked   = cfg.enabled || false;
+  document.getElementById('esUrl').value         = cfg.url || 'https://localhost:9200';
+  document.getElementById('esUsername').value    = cfg.username || 'elastic';
+  document.getElementById('esIndex').value       = cfg.index || 'cti-scans';
+  document.getElementById('esVerifySSL').checked = cfg.verify_ssl || false;
+}
+
+async function saveElasticConfig() {
+  const payload = {
+    enabled:    document.getElementById('esEnabled').checked,
+    url:        document.getElementById('esUrl').value.trim(),
+    username:   document.getElementById('esUsername').value.trim(),
+    index:      document.getElementById('esIndex').value.trim(),
+    verify_ssl: document.getElementById('esVerifySSL').checked,
+  };
+  const pass = document.getElementById('esPassword').value;
+  if (pass) payload.password = pass;
+
+  const r = await fetch('/api/elastic/config', { method: 'PUT', headers, body: JSON.stringify(payload) });
+  if (r.ok) toast('Elasticsearch configuration saved');
+  else toast('Failed to save', 'err');
+}
+
+// ═══════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════
+async function loadSettings() {
+  const r   = await fetch('/api/settings', { headers });
+  const cfg = await r.json();
+  document.getElementById('appName').value       = cfg.app_name || 'CTI Hub';
+  document.getElementById('sessionTimeout').value= cfg.session_timeout || 480;
+
+  // System info
+  const hr = await fetch('/health');
+  const hd = await hr.json();
+  document.getElementById('systemInfo').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;font-family:var(--mono);font-size:0.75rem">
+      <div><span style="color:var(--text-dim)">Version</span><br><span style="color:var(--text)">${hd.version}</span></div>
+      <div><span style="color:var(--text-dim)">Engines Active</span><br><span style="color:var(--text)">${hd.engines}</span></div>
+      <div><span style="color:var(--text-dim)">CAPA Status</span><br><span style="color:var(--text)">${hd.capa}</span></div>
+      <div><span style="color:var(--text-dim)">Elasticsearch</span><br><span style="color:var(--text)">${hd.elastic}</span></div>
+    </div>`;
+}
+
+async function saveSettings() {
+  const payload = {
+    app_name:        document.getElementById('appName').value.trim(),
+    session_timeout: parseInt(document.getElementById('sessionTimeout').value),
+  };
+  const r = await fetch('/api/settings', { method: 'PUT', headers, body: JSON.stringify(payload) });
+  if (r.ok) toast('Settings saved');
+  else toast('Failed to save', 'err');
+}
+
+function logout() {
+  localStorage.clear();
+  window.location.href = '/login';
+}
+
+// Init
+loadEngines();
+</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+# ── Secrets (NEVER commit these) ─────────────────────────────────
+config.json        # Contains API keys
+users.json         # Contains hashed passwords
+.jwt_secret        # JWT signing secret
+
+# ── Python ───────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+.venv/
+env/
+
+# ── Docker ───────────────────────────────────────────────────────
+# (docker-compose.yml is safe to commit — it contains no secrets)
+
+# ── CAPA cache ───────────────────────────────────────────────────
+capa_cache/
+
+# ── OS ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE ──────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp

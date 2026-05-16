@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CTI Hub — Threat Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #080c10;
+    --surface:     #0d1117;
+    --panel:       #111820;
+    --border:      #1e2d3d;
+    --accent:      #00d4ff;
+    --accent2:     #ff4757;
+    --accent3:     #2ed573;
+    --warn:        #ffa502;
+    --text:        #c9d1d9;
+    --text-dim:    #586069;
+    --text-bright: #e6edf3;
+    --glow:        0 0 20px rgba(0,212,255,0.3);
+    --glow-red:    0 0 20px rgba(255,71,87,0.4);
+    --glow-grn:    0 0 20px rgba(46,213,115,0.3);
+    --font-mono:   'Share Tech Mono', monospace;
+    --font-ui:     'Rajdhani', sans-serif;
+    --font-head:   'Orbitron', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px);
+    pointer-events: none; z-index: 9999;
+  }
+
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,212,255,0.018) 1px,transparent 1px), linear-gradient(90deg,rgba(0,212,255,0.018) 1px,transparent 1px);
+    background-size: 44px 44px;
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(8,12,16,0.96);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 58px;
+  }
+
+  .logo {
+    font-family: var(--font-head); font-size: 1.05rem; font-weight: 900;
+    color: var(--accent); letter-spacing: 3px; text-shadow: var(--glow);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-box {
+    width: 26px; height: 26px;
+    border: 2px solid var(--accent); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; box-shadow: var(--glow);
+    animation: pulse-box 3s ease-in-out infinite;
+  }
+  @keyframes pulse-box { 0%,100%{box-shadow:var(--glow)} 50%{box-shadow:0 0 30px rgba(0,212,255,0.6)} }
+
+  .header-right { display: flex; align-items: center; gap: 1.25rem; }
+  .live-badge { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent3); box-shadow: 0 0 8px var(--accent3); animation: blink 2s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  #clock { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); }
+
+  .user-badge {
+    font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dim);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .user-role { padding: 2px 8px; border: 1px solid var(--border); color: var(--accent); font-size: 0.62rem; letter-spacing: 1px; }
+
+  .header-btn {
+    font-family: var(--font-head); font-size: 0.65rem; font-weight: 700;
+    letter-spacing: 1.5px; padding: 5px 12px;
+    border: 1px solid var(--border); border-radius: 3px;
+    color: var(--text-dim); text-decoration: none; cursor: pointer;
+    background: transparent; transition: all 0.2s;
+  }
+  .header-btn:hover { border-color: var(--accent); color: var(--accent); box-shadow: var(--glow); }
+  .header-btn.admin { border-color: rgba(0,212,255,0.3); color: var(--accent); }
+
+  /* ── LAYOUT ── */
+  main { position: relative; z-index: 1; max-width: 1380px; margin: 0 auto; padding: 2rem; }
+
+  /* ── HERO ── */
+  .hero { text-align: center; padding: 2.5rem 0 2rem; }
+  .hero-label { font-family: var(--font-mono); font-size: 0.68rem; color: var(--accent); letter-spacing: 5px; opacity: 0.7; margin-bottom: 1rem; }
+  .hero h1 { font-family: var(--font-head); font-size: clamp(1.5rem,3vw,2.5rem); font-weight: 900; color: var(--text-bright); letter-spacing: 2px; line-height: 1.2; margin-bottom: 0.75rem; }
+  .hero h1 span { color: var(--accent); text-shadow: var(--glow); }
+  .hero p { color: var(--text-dim); font-size: 0.92rem; max-width: 560px; margin: 0 auto; }
+
+  .engines { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 1.2rem; }
+  .engine-pill { font-family: var(--font-mono); font-size: 0.65rem; padding: 4px 10px; border: 1px solid var(--border); border-radius: 20px; color: var(--text-dim); background: rgba(255,255,255,0.02); }
+  .engine-pill.disabled { opacity: 0.35; text-decoration: line-through; }
+
+  /* ── INPUT ── */
+  .input-section { margin: 1.5rem 0; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 1rem; background: var(--surface); padding: 4px; border-radius: 6px; border: 1px solid var(--border); width: fit-content; }
+  .tab { padding: 8px 22px; border: none; background: transparent; color: var(--text-dim); font-family: var(--font-ui); font-size: 0.85rem; font-weight: 600; letter-spacing: 1px; cursor: pointer; border-radius: 4px; transition: all 0.2s; }
+  .tab.active { background: var(--accent); color: var(--bg); box-shadow: var(--glow); }
+  .tab:not(.active):hover { color: var(--text-bright); background: var(--panel); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .input-row { display: flex; gap: 10px; align-items: stretch; }
+  .scan-input { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; color: var(--text-bright); font-family: var(--font-mono); font-size: 0.9rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; min-width: 0; }
+  .scan-input::placeholder { color: var(--text-dim); }
+  .scan-input:focus { border-color: var(--accent); box-shadow: var(--glow); }
+
+  .drop-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 2.5rem; text-align: center; cursor: pointer; transition: all 0.3s; background: var(--surface); position: relative; }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: rgba(0,212,255,0.04); box-shadow: var(--glow); }
+  .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .drop-icon { font-size: 2.2rem; margin-bottom: 0.6rem; display: block; }
+  .drop-text { color: var(--text-dim); font-size: 0.88rem; line-height: 1.6; }
+  .drop-text strong { color: var(--accent); }
+  .drop-filename { margin-top: 0.75rem; font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent3); display: none; }
+
+  .btn-scan { padding: 14px 28px; background: linear-gradient(135deg,var(--accent),#0099cc); border: none; border-radius: 6px; color: var(--bg); font-family: var(--font-head); font-size: 0.75rem; font-weight: 700; letter-spacing: 2px; cursor: pointer; white-space: nowrap; box-shadow: var(--glow); text-transform: uppercase; transition: all 0.2s; }
+  .btn-scan:hover { transform: translateY(-1px); box-shadow: 0 0 30px rgba(0,212,255,0.5); }
+  .btn-scan:active { transform: none; }
+  .btn-scan:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-file-scan { display: block; width: 100%; margin-top: 1rem; padding: 12px; background: linear-gradient(135deg,var(--accent),#0099cc); border: none; border-radius: 6px; color: var(--bg); font-family: var(--font-head); font-size: 0.75rem; font-weight: 700; letter-spacing: 2px; cursor: pointer; box-shadow: var(--glow); text-transform: uppercase; transition: all 0.2s; }
+  .btn-file-scan:hover { box-shadow: 0 0 30px rgba(0,212,255,0.5); }
+  .btn-file-scan:disabled { opacity: 0.4; cursor: not-allowed; }
+  .input-hint { margin-top: 8px; font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dim); }
+
+  /* ── VERDICT ── */
+  .verdict-bar { display: none; margin: 1.5rem 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); animation: fadeSlide 0.35s ease; }
+  @keyframes fadeSlide { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+  .verdict-inner { padding: 1.25rem 1.75rem; display: flex; align-items: center; gap: 1.75rem; flex-wrap: wrap; }
+  .verdict-badge { font-family: var(--font-head); font-size: 1.3rem; font-weight: 900; letter-spacing: 3px; padding: 8px 18px; border-radius: 4px; text-transform: uppercase; flex-shrink: 0; border: 1px solid; }
+  .verdict-MALICIOUS .verdict-badge  { color:var(--accent2);border-color:var(--accent2);background:rgba(255,71,87,0.1);box-shadow:var(--glow-red); }
+  .verdict-CLEAN     .verdict-badge  { color:var(--accent3);border-color:var(--accent3);background:rgba(46,213,115,0.08);box-shadow:var(--glow-grn); }
+  .verdict-SUSPICIOUS .verdict-badge { color:var(--warn);border-color:var(--warn);background:rgba(255,165,2,0.08); }
+  .verdict-UNKNOWN   .verdict-badge  { color:var(--text-dim);border-color:var(--border);background:rgba(255,255,255,0.03); }
+  .score-ring { flex-shrink:0;position:relative;width:76px;height:76px; }
+  .score-ring svg { transform:rotate(-90deg); }
+  .score-text { position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font-head);font-size:1.05rem;font-weight:900;color:var(--text-bright); }
+  .score-label { font-size:0.42rem;color:var(--text-dim);letter-spacing:1px; }
+  .verdict-meta { flex:1;min-width:180px; }
+  .verdict-meta .v-title { font-family:var(--font-head);font-size:0.65rem;color:var(--text-dim);letter-spacing:2px;margin-bottom:0.4rem; }
+  .verdict-meta .v-target { font-family:var(--font-mono);font-size:0.82rem;color:var(--text-bright);word-break:break-all;margin-bottom:0.35rem; }
+  .verdict-meta .v-detail { font-size:0.8rem;color:var(--text-dim); }
+
+  /* ── RESULTS GRID ── */
+  .results-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(295px,1fr)); gap: 1rem; margin: 1rem 0; }
+  .tool-card { background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;position:relative;transition:border-color 0.2s,transform 0.2s;animation:cardIn 0.4s ease both; }
+  .tool-card::before { content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0.4; }
+  .tool-card:hover { border-color:rgba(0,212,255,0.3);transform:translateY(-2px); }
+  @keyframes cardIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  .card-head { display:flex;align-items:center;justify-content:space-between;padding:0.7rem 1rem;border-bottom:1px solid var(--border); }
+  .card-name { display:flex;align-items:center;gap:8px;font-family:var(--font-ui);font-size:0.82rem;font-weight:700;letter-spacing:0.5px;color:var(--text-bright); }
+  .card-icon { width:22px;height:22px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0; }
+  .card-status { font-family:var(--font-mono);font-size:0.65rem;padding:3px 8px;border-radius:3px;border:1px solid;text-transform:uppercase;letter-spacing:1px; }
+  .st-loading    { border-color:var(--text-dim);color:var(--text-dim);animation:stPulse 1s infinite; }
+  .st-malicious  { border-color:var(--accent2);color:var(--accent2);background:rgba(255,71,87,0.1); }
+  .st-clean      { border-color:var(--accent3);color:var(--accent3);background:rgba(46,213,115,0.07); }
+  .st-suspicious { border-color:var(--warn);color:var(--warn);background:rgba(255,165,2,0.07); }
+  .st-error      { border-color:var(--text-dim);color:var(--text-dim); }
+  .st-unknown    { border-color:var(--border);color:var(--text-dim); }
+  @keyframes stPulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+  .card-body { padding:1rem;font-family:var(--font-mono);font-size:0.76rem;color:var(--text-dim);min-height:78px; }
+  .card-body .loading-dots::after { content:'...';animation:dots 1.2s steps(4,end) infinite; }
+  @keyframes dots { 0%,20%{content:''} 40%{content:'.'} 60%{content:'..'} 80%,100%{content:'...'} }
+  .kv { display:flex;justify-content:space-between;padding:3px 0;gap:8px;border-bottom:1px solid rgba(255,255,255,0.03); }
+  .kv:last-child { border-bottom:none; }
+  .kv-k { color:var(--text-dim);flex-shrink:0; }
+  .kv-v { color:var(--text-bright);text-align:right;word-break:break-all; }
+  .kv-v.red  { color:var(--accent2); }
+  .kv-v.grn  { color:var(--accent3); }
+  .kv-v.warn { color:var(--warn); }
+  .card-link { display:block;margin-top:0.7rem;text-align:right;color:var(--accent);font-family:var(--font-mono);font-size:0.67rem;text-decoration:none;opacity:0.55;transition:opacity 0.2s; }
+  .card-link:hover { opacity:1; }
+  .card-capa { grid-column:1/-1;border-color:rgba(0,212,255,0.2); }
+  .techniques { display:flex;flex-wrap:wrap;gap:5px;margin-top:0.6rem; }
+  .t-tag { padding:2px 7px;border:1px solid var(--border);border-radius:3px;font-size:0.67rem;color:var(--text-dim);font-family:var(--font-mono); }
+  .t-tag.high { border-color:var(--accent2);color:var(--accent2); }
+  .t-tag.med  { border-color:var(--warn);color:var(--warn); }
+
+  /* ── CAPA PROGRESS ── */
+  .capa-progress-bar { background:var(--border);border-radius:4px;height:6px;overflow:hidden;margin:8px 0; }
+  .capa-progress-fill { background:var(--accent);height:100%;transition:width 1s ease;box-shadow:var(--glow); }
+
+  /* ── LOG ── */
+  .log-section { margin-top: 2rem; }
+  .log-panel { background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;position:relative; }
+  .log-panel::before { content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0.25; }
+  .log-head { padding:0.75rem 1.2rem;border-bottom:1px solid var(--border);font-family:var(--font-head);font-size:0.65rem;font-weight:700;letter-spacing:2px;color:var(--accent);text-transform:uppercase;display:flex;align-items:center;gap:8px; }
+  .log-body { padding:0.8rem 1.2rem;font-family:var(--font-mono);font-size:0.72rem;max-height:180px;overflow-y:auto;color:var(--text-dim); }
+  .log-entry { padding:2px 0;display:flex;gap:10px; }
+  .log-t { color:var(--accent);opacity:0.55;flex-shrink:0; }
+  .log-m.ok   { color:var(--accent3); }
+  .log-m.err  { color:var(--accent2); }
+  .log-m.warn { color:var(--warn); }
+  .log-m.info { color:var(--text-dim); }
+
+  ::-webkit-scrollbar { width:5px;height:5px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--border);border-radius:3px; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--accent); }
+
+  .spinner { display:inline-block;width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  #toast { position:fixed;bottom:2rem;right:2rem;background:var(--panel);border:1px solid var(--accent);border-radius:6px;padding:10px 18px;font-family:var(--font-mono);font-size:0.78rem;color:var(--accent);box-shadow:var(--glow);z-index:9998;opacity:0;transform:translateY(8px);transition:all 0.25s;pointer-events:none; }
+  #toast.show { opacity:1;transform:translateY(0); }
+
+  @media (max-width:640px) { main{padding:1rem;} .input-row{flex-direction:column;} .results-grid{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-box">⬡</div>
+    CTI·HUB
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><span class="dot"></span>ONLINE</div>
+    <span id="clock"></span>
+    <div class="user-badge">
+      <span id="headerUsername"></span>
+      <span class="user-role" id="headerRole"></span>
+    </div>
+    <a class="header-btn admin" id="adminLink" href="/admin" style="display:none">⚙ ADMIN</a>
+    <button class="header-btn" onclick="logout()">SIGN OUT</button>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="hero-label">// Smart SIEM — Cyber Threat Intelligence</div>
+    <h1>MULTI-ENGINE<br><span>THREAT ANALYSIS</span></h1>
+    <p>Paste any hash, IP, URL — or drop a file. All enabled engines run in parallel.</p>
+    <div class="engines" id="enginePills"></div>
+  </div>
+
+  <div class="input-section">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('hash')">HASH / IP / URL</button>
+      <button class="tab"        onclick="switchTab('file')">FILE UPLOAD</button>
+    </div>
+
+    <div class="tab-content active" id="tab-hash">
+      <div class="input-row">
+        <input class="scan-input" id="hashInput" type="text" placeholder="MD5 · SHA1 · SHA256 · IP address · URL · domain" autocomplete="off" spellcheck="false"/>
+        <button class="btn-scan" id="btnScan" onclick="startScan()">⬡ SCAN</button>
+      </div>
+      <div class="input-hint">Auto-detects: MD5 (32) · SHA1 (40) · SHA256 (64) · IPv4 · URL · domain</div>
+    </div>
+
+    <div class="tab-content" id="tab-file">
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" onchange="handleFileSelect(event)">
+        <span class="drop-icon">📂</span>
+        <div class="drop-text"><strong>Drop file here</strong> or click to browse<br><span style="font-size:0.76rem">EXE · DLL · PDF · Office · Script · APK · ZIP — max 32 MB</span></div>
+        <div class="drop-filename" id="dropFilename"></div>
+      </div>
+      <button class="btn-file-scan" id="btnFileScan" onclick="startFileScan()">⬡ ANALYZE FILE</button>
+    </div>
+  </div>
+
+  <div class="verdict-bar" id="verdictBar"><div class="verdict-inner" id="verdictInner"></div></div>
+  <div class="results-grid" id="resultsGrid"></div>
+
+  <div class="log-section">
+    <div class="log-panel">
+      <div class="log-head">⬡ ACTIVITY LOG</div>
+      <div class="log-body" id="activityLog">
+        <div class="log-entry"><span class="log-t">--:--:--</span><span class="log-m info">CTI Hub ready. Authenticating...</span></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+// ── AUTH ──────────────────────────────────────────────
+const TOKEN = localStorage.getItem('cti_token');
+if (!TOKEN) window.location.href = '/login';
+
+const AUTH_HEADERS = {
+  'Authorization': `Bearer ${TOKEN}`,
+  'Content-Type':  'application/json',
+};
+
+let currentUser = null;
+let enabledEngines = [];
+
+// Verify token and load user
+fetch('/api/auth/me', { headers: AUTH_HEADERS })
+  .then(r => {
+    if (!r.ok) { localStorage.clear(); window.location.href = '/login'; }
+    return r.json();
+  })
+  .then(u => {
+    currentUser = u;
+    document.getElementById('headerUsername').textContent = u.username;
+    document.getElementById('headerRole').textContent     = u.role.toUpperCase();
+    if (u.role === 'admin') document.getElementById('adminLink').style.display = 'inline-block';
+    log(`Signed in as ${u.username} (${u.role})`, 'ok');
+    loadEngines();
+  })
+  .catch(() => { localStorage.clear(); window.location.href = '/login'; });
+
+function logout() {
+  localStorage.clear();
+  window.location.href = '/login';
+}
+
+// ── CLOCK ──────────────────────────────────────────────
+function tick() { document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-US',{hour12:false}); }
+setInterval(tick,1000); tick();
+
+// ── ENGINES ──────────────────────────────────────────────
+async function loadEngines() {
+  try {
+    const r = await fetch('/api/engines', { headers: AUTH_HEADERS });
+    const engines = await r.json();
+    enabledEngines = engines.filter(e => e.enabled);
+
+    const pills = document.getElementById('enginePills');
+    pills.innerHTML = engines.map(e =>
+      `<span class="engine-pill ${e.enabled ? '' : 'disabled'}">${e.icon || ''} ${e.name}</span>`
+    ).join('');
+
+    // Check CAPA
+    const cr = await fetch('/api/capa/config', { headers: AUTH_HEADERS });
+    const cc = await cr.json();
+    if (cc.enabled) {
+      pills.innerHTML += `<span class="engine-pill">🍓 CAPA</span>`;
+    }
+  } catch(e) {
+    log('Failed to load engine list', 'err');
+  }
+}
+
+// ── TABS ──────────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===(id==='hash'?0:1)));
+  document.getElementById('tab-hash').classList.toggle('active', id==='hash');
+  document.getElementById('tab-file').classList.toggle('active', id==='file');
+}
+
+// ── INPUT DETECTION ──────────────────────────────────────────────
+function detectType(s) {
+  s = s.trim();
+  if (/^[a-fA-F0-9]{32}$/.test(s))  return 'md5';
+  if (/^[a-fA-F0-9]{40}$/.test(s))  return 'sha1';
+  if (/^[a-fA-F0-9]{64}$/.test(s))  return 'sha256';
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(s)) return 'ip';
+  if (/^https?:\/\/.+/.test(s))      return 'url';
+  if (/^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$/.test(s)) return 'domain';
+  return null;
+}
+
+// ── FILE HANDLING ──────────────────────────────────────────────
+let selectedFile = null;
+
+function handleFileSelect(e) {
+  selectedFile = e.target.files[0];
+  if (!selectedFile) return;
+  const fn = document.getElementById('dropFilename');
+  fn.style.display = 'block';
+  fn.textContent = `📄 ${selectedFile.name}  (${(selectedFile.size/1024).toFixed(1)} KB)`;
+}
+
+const dz = document.getElementById('dropZone');
+['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag-over'); }));
+['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag-over'); }));
+dz.addEventListener('drop', e => {
+  const f = e.dataTransfer.files[0];
+  if (f) { selectedFile = f; document.getElementById('fileInput').files = e.dataTransfer.files; handleFileSelect({target:{files:[f]}}); }
+});
+
+// ── SCAN ──────────────────────────────────────────────
+async function startScan() {
+  const raw = document.getElementById('hashInput').value.trim();
+  if (!raw) { showToast('⚠ Enter a hash, IP, or URL'); return; }
+  const type = detectType(raw);
+  if (!type) { showToast('⚠ Could not recognise input type'); return; }
+
+  log(`Scanning [${type.toUpperCase()}] ${raw.substring(0,50)}`, 'info');
+  document.getElementById('btnScan').disabled = true;
+  clearResults();
+  showVerdictLoading(raw);
+
+  // Find applicable engines
+  const typeMap = { md5:['hash'],sha1:['hash'],sha256:['hash'],ip:['ip'],domain:['domain','url'],url:['url'] };
+  const applicable = enabledEngines.filter(e => (e.supports||[]).some(s => (typeMap[type]||[type]).includes(s)));
+
+  // Check if CAPA is enabled for hashes
+  let capaEnabled = false;
+  try {
+    const cr = await fetch('/api/capa/config', { headers: AUTH_HEADERS });
+    const cc = await cr.json();
+    capaEnabled = cc.enabled && ['md5','sha1','sha256'].includes(type);
+  } catch(e) {}
+
+  const tools = [...applicable.map(e => e.id), ...(capaEnabled ? ['capa_hash'] : [])];
+  buildCards(tools, applicable, capaEnabled);
+
+  const results = await Promise.allSettled(tools.map(t => runTool(t, raw, type)));
+  const scores  = results.filter(r => r.status==='fulfilled' && r.value?.score!=null).map(r => r.value.score);
+  setVerdict(raw, type, scores, tools.length);
+  document.getElementById('btnScan').disabled = false;
+  shipToElastic(raw, type, scores, tools.length);
+}
+
+async function startFileScan() {
+  if (!selectedFile) { showToast('⚠ Select a file first'); return; }
+  log(`File: ${selectedFile.name} (${(selectedFile.size/1024).toFixed(0)} KB)`, 'info');
+  document.getElementById('btnFileScan').disabled = true;
+  clearResults();
+  showVerdictLoading(selectedFile.name);
+
+  const hashEngines = enabledEngines.filter(e => (e.supports||[]).includes('hash'));
+  const tools = [...hashEngines.map(e => e.id), 'capa_file'];
+  buildCards(tools, hashEngines, true);
+
+  const capaResult = await runCapaFile();
+  const sha256 = capaResult?.sha256 || '';
+  if (sha256) log(`SHA256: ${sha256}`, 'info');
+
+  const hashResults = await Promise.allSettled(
+    hashEngines.map(e => sha256 ? runTool(e.id, sha256, 'sha256') : Promise.resolve({score:null}))
+  );
+
+  const scores = [capaResult, ...hashResults.map(r => r.status==='fulfilled' ? r.value : null)]
+    .filter(r => r?.score != null).map(r => r.score);
+
+  setVerdict(selectedFile.name, 'file', scores, tools.length);
+  document.getElementById('btnFileScan').disabled = false;
+  shipToElastic(selectedFile.name, 'file', scores, tools.length);
+}
+
+// ── TOOL RUNNERS ──────────────────────────────────────────────
+async function runTool(tool, value, type) {
+  setStatus(tool, 'loading');
+  try {
+    const r = await callTool(tool, value, type);
+    setStatus(tool, r.status);
+    setBody(tool, r.rows||[], r.link, r.techniques);
+    return r;
+  } catch(e) {
+    setStatus(tool, 'error');
+    setBody(tool, [['Error', e.message||'Request failed']]);
+    log(`${tool}: ${e.message}`, 'err');
+    return {status:'error',score:null};
+  }
+}
+
+async function runCapaFile() {
+  setStatus('capa_file', 'loading');
+  const startTime = Date.now();
+  const timerInterval = setInterval(() => {
+    const elapsed = Math.floor((Date.now()-startTime)/1000);
+    const mins = Math.floor(elapsed/60);
+    const secs = elapsed%60;
+    const timeStr = mins>0 ? `${mins}m ${secs}s` : `${secs}s`;
+    const pct = Math.min(95, Math.floor(elapsed/3));
+    const el = document.getElementById('body-capa_file');
+    if (el) el.innerHTML = `
+      <div style="margin-bottom:8px;color:var(--text-dim)">CAPA analyzing... <span style="color:var(--accent)">${timeStr}</span></div>
+      <div class="capa-progress-bar"><div class="capa-progress-fill" style="width:${pct}%"></div></div>
+      <div style="margin-top:6px;font-size:0.65rem;color:var(--text-dim)">Large files can take 3-8 min · Results cached after first run</div>`;
+  }, 1000);
+
+  try {
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+    const r = await fetch('/api/capa/file', { method:'POST', headers:{'Authorization':`Bearer ${TOKEN}`}, body:fd });
+    clearInterval(timerInterval);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    setStatus('capa_file', d.status||'unknown');
+    setBody('capa_file', d.rows||[], null, d.techniques);
+    return d;
+  } catch(e) {
+    clearInterval(timerInterval);
+    setStatus('capa_file', 'error');
+    setBody('capa_file', [['Error', e.message]]);
+    return {score:null};
+  }
+}
+
+async function callTool(tool, value, type) {
+  const enc = encodeURIComponent;
+  const base = '';
+  let url;
+  switch(tool) {
+    case 'virustotal':    url = `/api/virustotal?type=${type}&value=${enc(value)}`; break;
+    case 'abuseipdb':    url = `/api/abuseipdb?ip=${enc(value)}`; break;
+    case 'shodan':       url = `/api/shodan?ip=${enc(value)}`; break;
+    case 'otx':          url = `/api/otx?type=${type}&value=${enc(value)}`; break;
+    case 'urlscan':      url = `/api/urlscan?url=${enc(value)}`; break;
+    case 'greynoise':    url = `/api/greynoise?ip=${enc(value)}`; break;
+    case 'hybridanalysis': url = `/api/hybridanalysis?hash=${enc(value)}`; break;
+    case 'malwarebazaar':  url = `/api/malwarebazaar?hash=${enc(value)}`; break;
+    case 'threatfox':    url = `/api/threatfox?value=${enc(value)}`; break;
+    case 'capa_hash':    url = `/api/capa/hash?hash=${enc(value)}`; break;
+    default: throw new Error(`Unknown tool: ${tool}`);
+  }
+  const r = await fetch(url, { headers: AUTH_HEADERS });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+// ── CARD RENDERING ──────────────────────────────────────────────
+const TOOL_COLORS = {
+  virustotal:'#394bf5',abuseipdb:'#e34c26',shodan:'#e53935',otx:'#009688',
+  urlscan:'#1e88e5',greynoise:'#607d8b',hybridanalysis:'#8bc34a',
+  malwarebazaar:'#ff5722',threatfox:'#ff9800',capa_hash:'#e91e63',capa_file:'#e91e63',
+};
+
+function buildCards(tools, engines, capaEnabled) {
+  const grid = document.getElementById('resultsGrid');
+  grid.innerHTML = '';
+
+  const engineMap = {};
+  engines.forEach(e => engineMap[e.id] = e);
+
+  tools.forEach((t, i) => {
+    const isCapa = t.startsWith('capa');
+    const engine = engineMap[t];
+    const name  = engine?.name || (t === 'capa_hash' ? 'CAPA' : t === 'capa_file' ? 'CAPA' : t);
+    const icon  = engine?.icon || (isCapa ? '🍓' : '⬡');
+    const color = TOOL_COLORS[t] || '#555';
+
+    const card = document.createElement('div');
+    card.className = `tool-card${isCapa ? ' card-capa' : ''}`;
+    card.id = `card-${t}`;
+    card.style.animationDelay = `${i*55}ms`;
+    card.innerHTML = `
+      <div class="card-head">
+        <div class="card-name">
+          <div class="card-icon" style="background:${color}22;border:1px solid ${color}44">${icon}</div>
+          ${name}
+        </div>
+        <div class="card-status st-loading" id="status-${t}">LOADING</div>
+      </div>
+      <div class="card-body" id="body-${t}">
+        <span style="color:var(--text-dim)">Querying<span class="loading-dots"></span></span>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+const STATUS_LABELS = {loading:'LOADING',malicious:'MALICIOUS',clean:'CLEAN',suspicious:'SUSPICIOUS',error:'ERROR',unknown:'N/A'};
+
+function setStatus(tool, status) {
+  const el = document.getElementById('status-'+tool);
+  if (!el) return;
+  el.className = `card-status st-${status}`;
+  el.textContent = STATUS_LABELS[status] || status.toUpperCase();
+}
+
+function setBody(tool, rows=[], link=null, techniques=[]) {
+  const el = document.getElementById('body-'+tool);
+  if (!el) return;
+  let html = rows.map(([k,v,cls='']) =>
+    `<div class="kv"><span class="kv-k">${k}</span><span class="kv-v ${cls}">${v}</span></div>`
+  ).join('');
+  if (techniques && techniques.length) {
+    html += `<div style="margin:8px 0 4px;font-size:0.67rem;color:var(--text-dim)">TECHNIQUES DETECTED</div>`;
+    html += `<div class="techniques">`;
+    techniques.slice(0,14).forEach(t => { html += `<span class="t-tag ${t.severity||'low'}">${t.name}</span>`; });
+    html += `</div>`;
+  }
+  if (link) html += `<a class="card-link" href="${link}" target="_blank" rel="noopener">→ Full report</a>`;
+  el.innerHTML = html || '<span style="color:var(--text-dim)">No data returned</span>';
+}
+
+// ── VERDICT ──────────────────────────────────────────────
+function showVerdictLoading(target) {
+  const bar = document.getElementById('verdictBar');
+  bar.style.display = 'block'; bar.style.borderColor = 'var(--border)'; bar.className = 'verdict-bar';
+  document.getElementById('verdictInner').innerHTML = `
+    <div class="verdict-badge" style="color:var(--text-dim);border-color:var(--border);background:rgba(255,255,255,0.03)">SCANNING</div>
+    <div style="color:var(--text-dim);font-family:var(--font-mono);font-size:0.78rem">
+      <span class="spinner"></span>&nbsp;Querying engines for <strong style="color:var(--text-bright)">${target.substring(0,55)}${target.length>55?'...':''}</strong>
+    </div>`;
+}
+
+function setVerdict(target, type, scores, totalEngines) {
+  const bar = document.getElementById('verdictBar');
+  const inner = document.getElementById('verdictInner');
+  let verdict='UNKNOWN', color='var(--text-dim)', avg=0;
+  if (scores.length) {
+    avg = scores.reduce((a,b)=>a+b,0)/scores.length;
+    if      (avg>=0.60) { verdict='MALICIOUS';  color='var(--accent2)'; }
+    else if (avg>=0.25) { verdict='SUSPICIOUS'; color='var(--warn)'; }
+    else                { verdict='CLEAN';      color='var(--accent3)'; }
+  }
+  const pct = Math.round(avg*100);
+  const circ = 2*Math.PI*26;
+  const dash = circ-(pct/100*circ);
+  bar.style.borderColor = color;
+  bar.className = `verdict-bar verdict-${verdict}`;
+  inner.innerHTML = `
+    <div class="verdict-badge">${verdict}</div>
+    <div class="score-ring">
+      <svg width="76" height="76" viewBox="0 0 76 76">
+        <circle cx="38" cy="38" r="26" fill="none" stroke="var(--border)" stroke-width="5"/>
+        <circle cx="38" cy="38" r="26" fill="none" stroke="${color}" stroke-width="5"
+          stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${dash.toFixed(1)}"
+          stroke-linecap="round" style="transition:stroke-dashoffset 0.7s ease"/>
+      </svg>
+      <div class="score-text"><span>${pct}%</span><span class="score-label">THREAT</span></div>
+    </div>
+    <div class="verdict-meta">
+      <div class="v-title">ANALYSIS TARGET</div>
+      <div class="v-target">${target.substring(0,60)}${target.length>60?'...':''}</div>
+      <div class="v-detail">Type: <strong style="color:var(--text-bright)">${type.toUpperCase()}</strong> · Engines: <strong style="color:var(--text-bright)">${scores.length}/${totalEngines}</strong> · Score: <strong style="color:${color}">${pct}%</strong></div>
+    </div>`;
+  log(`VERDICT: ${verdict} — ${pct}% threat score across ${scores.length} engines`, verdict==='MALICIOUS'?'err':verdict==='SUSPICIOUS'?'warn':'ok');
+}
+
+function clearResults() {
+  document.getElementById('resultsGrid').innerHTML='';
+  document.getElementById('verdictBar').style.display='none';
+}
+
+// ── ELASTIC SHIPPING ──────────────────────────────────────────────
+async function shipToElastic(target, type, scores, enginesTotal) {
+  try {
+    const avg = scores.length ? scores.reduce((a,b)=>a+b,0)/scores.length : 0;
+    const pct = Math.round(avg*100);
+    let verdict = 'UNKNOWN';
+    if      (avg>=0.60) verdict='MALICIOUS';
+    else if (avg>=0.25) verdict='SUSPICIOUS';
+    else if (scores.length) verdict='CLEAN';
+
+    const techniques = [];
+    document.querySelectorAll('.t-tag').forEach(t => {
+      techniques.push({name:t.textContent,severity:t.classList.contains('high')?'high':t.classList.contains('med')?'med':'low'});
+    });
+    const results = {};
+    document.querySelectorAll('[id^="status-"]').forEach(el => {
+      results[el.id.replace('status-','')] = el.textContent;
+    });
+
+    await fetch('/api/elastic/scan', {
+      method: 'POST',
+      headers: AUTH_HEADERS,
+      body: JSON.stringify({target,type,verdict,score:avg,engines_total:enginesTotal,engines_hit:scores.length,results,techniques}),
+    });
+    log('Results shipped to Kibana', 'ok');
+  } catch(e) {
+    log('Elastic shipping failed: '+e.message, 'warn');
+  }
+}
+
+// ── LOG ──────────────────────────────────────────────
+function log(msg, type='info') {
+  const el   = document.getElementById('activityLog');
+  const time = new Date().toLocaleTimeString('en-US',{hour12:false});
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-t">${time}</span><span class="log-m ${type}">${msg}</span>`;
+  el.appendChild(entry);
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── TOAST ──────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── ENTER KEY ──────────────────────────────────────────────
+document.getElementById('hashInput').addEventListener('keydown', e => { if (e.key==='Enter') startScan(); });
+</script>
+</body>
+</html>

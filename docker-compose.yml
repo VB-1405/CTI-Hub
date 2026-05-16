@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  cti-hub:
+    build: .
+    container_name: cti-hub
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      # Persist config, users, and CAPA cache between restarts
+      - cti_data:/data
+      # If you have CAPA installed on the host, mount the binary
+      # - /usr/local/bin/capa:/usr/local/bin/capa:ro
+    environment:
+      - CAPA_CACHE=/data/capa_cache
+      # Optional: set CAPA binary path if mounted above
+      # - CAPA_BIN=/usr/local/bin/capa
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  cti_data:
+    driver: local
+
+# ─────────────────────────────────────────────────────────────────
+# USAGE:
+#
+#   Start:    docker compose up -d
+#   Stop:     docker compose down
+#   Logs:     docker compose logs -f
+#   Update:   docker compose pull && docker compose up -d
+#   Reset:    docker compose down -v  (WARNING: deletes all data)
+#
+# First run:
+#   1. docker compose up -d
+#   2. Open http://localhost:5000/setup
+#   3. Create your admin account
+#   4. Go to Admin → API Engines → add your API keys
+#
+# With Nginx reverse proxy (recommended for production):
+#   Point Nginx to http://cti-hub:5000
+#   See nginx-example.conf in this repo
+# ─────────────────────────────────────────────────────────────────
