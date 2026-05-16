@@ -2,7 +2,8 @@
 
 A self-hosted, open-source threat intelligence aggregator that queries multiple CTI engines in parallel and correlates results into a unified verdict. Designed to integrate with any SIEM tool.
 
-![CTI Hub Dashboard](docs/screenshot.png)
+<img width="1440" height="859" alt="Screenshot 2026-05-16 at 1 55 13 PM" src="https://github.com/user-attachments/assets/47425085-7062-4378-98d5-8edfb6c95b9a" />
+
 
 ---
 
@@ -41,7 +42,7 @@ A self-hosted, open-source threat intelligence aggregator that queries multiple 
 
 ```bash
 # 1. Clone
-git clone https://github.com/yourusername/cti-hub.git
+git clone https://github.com/VB-1405/CTI-Hub
 cd cti-hub
 
 # 2. Start
@@ -62,7 +63,7 @@ That's it. The dashboard is at `http://localhost:5000`.
 
 ```bash
 # 1. Clone
-git clone https://github.com/yourusername/cti-hub.git
+git clone https://github.com/VB-1405/CTI-Hub
 cd cti-hub
 
 # 2. Install dependencies
