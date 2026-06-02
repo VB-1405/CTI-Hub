@@ -234,6 +234,15 @@
       <div class="nav-item" onclick="showPage('elastic')" id="nav-elastic">
         <span class="icon">📊</span> Elasticsearch
       </div>
+      <div class="nav-item" onclick="showPage('splunk')" id="nav-splunk">
+        <span class="icon">🔍</span> Splunk HEC
+      </div>
+      <div class="nav-item" onclick="showPage('misp')" id="nav-misp">
+        <span class="icon">🌐</span> MISP
+      </div>
+      <div class="nav-item" onclick="showPage('webhooks')" id="nav-webhooks">
+        <span class="icon">🔔</span> Webhooks
+      </div>
 
       <div class="nav-section">System</div>
       <div class="nav-item" onclick="showPage('settings')" id="nav-settings">
@@ -464,6 +473,163 @@
       </div>
     </div>
 
+
+    <!-- ── SPLUNK PAGE ── -->
+    <div class="page" id="page-splunk">
+      <div class="page-header">
+        <div class="page-title">Splunk HEC Integration</div>
+        <div class="page-desc">Ship every CTI scan result to Splunk via HTTP Event Collector. Results appear in Splunk as sourcetype=cti_hub.</div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Setup Guide</span></div>
+        <div class="card-body">
+          <p style="font-size:0.82rem;color:var(--text-mid);margin-bottom:0.75rem">In Splunk: Settings → Data Inputs → HTTP Event Collector → New Token</p>
+          <div style="background:var(--bg);border:1px solid var(--border2);padding:0.75rem 1rem;font-family:var(--mono);font-size:0.75rem;color:var(--text-mid)">
+            1. Enable HEC in Splunk global settings<br>
+            2. Create a new token with index=cti_hub<br>
+            3. Copy the token below<br>
+            4. Default HEC URL: https://your-splunk:8088/services/collector/event
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Connection Settings</span></div>
+        <div class="card-body">
+          <div class="form-field" style="margin-bottom:1.25rem">
+            <label class="form-label">Enable Splunk Shipping</label>
+            <label class="toggle" style="margin-top:0.25rem">
+              <input type="checkbox" id="splunkEnabled">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="form-grid">
+            <div class="form-field full">
+              <label class="form-label">HEC URL</label>
+              <input class="form-input" type="text" id="splunkUrl" placeholder="https://localhost:8088/services/collector/event">
+            </div>
+            <div class="form-field">
+              <label class="form-label">HEC Token</label>
+              <input class="form-input" type="password" id="splunkToken" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+            </div>
+            <div class="form-field">
+              <label class="form-label">Index</label>
+              <input class="form-input" type="text" id="splunkIndex" placeholder="cti_hub">
+            </div>
+            <div class="form-field" style="align-self:end">
+              <label class="form-label">Verify SSL</label>
+              <label class="toggle" style="margin-top:0.3rem">
+                <input type="checkbox" id="splunkVerifySSL">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <div style="margin-top:1.25rem;display:flex;gap:0.5rem">
+            <button class="btn btn-primary" onclick="saveSplunkConfig()">Save</button>
+            <button class="btn btn-ghost" onclick="testSplunk()">Test Connection</button>
+          </div>
+          <div id="splunkTestResult" style="margin-top:0.75rem;font-family:var(--mono);font-size:0.72rem;display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MISP PAGE ── -->
+    <div class="page" id="page-misp">
+      <div class="page-header">
+        <div class="page-title">MISP Integration</div>
+        <div class="page-desc">Connect to a self-hosted MISP instance for fully offline threat intelligence. MISP appears as an engine in the scanner.</div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Setup Guide</span></div>
+        <div class="card-body">
+          <div style="background:var(--bg);border:1px solid var(--border2);padding:0.75rem 1rem;font-family:var(--mono);font-size:0.75rem;color:var(--text-mid)">
+            # Quick MISP Docker install<br>
+            git clone https://github.com/MISP/misp-docker<br>
+            cd misp-docker && cp template.env .env<br>
+            docker compose up -d<br><br>
+            # Get API key: MISP → Administration → List Auth Keys
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Connection Settings</span></div>
+        <div class="card-body">
+          <div class="form-field" style="margin-bottom:1.25rem">
+            <label class="form-label">Enable MISP Engine</label>
+            <label class="toggle" style="margin-top:0.25rem">
+              <input type="checkbox" id="mispEnabled">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="form-grid">
+            <div class="form-field full">
+              <label class="form-label">MISP URL</label>
+              <input class="form-input" type="text" id="mispUrl" placeholder="https://your-misp-instance">
+            </div>
+            <div class="form-field">
+              <label class="form-label">API Key</label>
+              <input class="form-input" type="password" id="mispKey" placeholder="Your MISP auth key">
+            </div>
+            <div class="form-field" style="align-self:end">
+              <label class="form-label">Verify SSL</label>
+              <label class="toggle" style="margin-top:0.3rem">
+                <input type="checkbox" id="mispVerifySSL">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <div style="margin-top:1.25rem">
+            <button class="btn btn-primary" onclick="saveMispConfig()">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── WEBHOOKS PAGE ── -->
+    <div class="page" id="page-webhooks">
+      <div class="page-header">
+        <div class="page-title">Alert Webhooks</div>
+        <div class="page-desc">Automatically fire a webhook when a scan exceeds the threat score threshold. Supports Slack, Discord, and Microsoft Teams.</div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Webhook Configuration</span></div>
+        <div class="card-body">
+          <div class="form-field" style="margin-bottom:1.25rem">
+            <label class="form-label">Enable Webhooks</label>
+            <label class="toggle" style="margin-top:0.25rem">
+              <input type="checkbox" id="webhookEnabled">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="form-grid">
+            <div class="form-field full">
+              <label class="form-label">Webhook URL</label>
+              <input class="form-input" type="text" id="webhookUrl" placeholder="https://hooks.slack.com/services/...">
+              <div class="form-hint" style="margin-top:0.3rem">Slack / Discord / Teams incoming webhook URL</div>
+            </div>
+            <div class="form-field">
+              <label class="form-label">Platform</label>
+              <select class="form-input" id="webhookPlatform">
+                <option value="slack">Slack</option>
+                <option value="discord">Discord</option>
+                <option value="teams">Microsoft Teams</option>
+                <option value="generic">Generic (JSON)</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="form-label">Alert Threshold (0.0 — 1.0)</label>
+              <input class="form-input" type="number" id="webhookThreshold" placeholder="0.7" min="0" max="1" step="0.05">
+              <div class="form-hint" style="margin-top:0.3rem">Fire alert when threat score ≥ this value (0.7 = 70%)</div>
+            </div>
+          </div>
+          <div style="margin-top:1.25rem;display:flex;gap:0.5rem">
+            <button class="btn btn-primary" onclick="saveWebhookConfig()">Save</button>
+            <button class="btn btn-ghost" onclick="testWebhook()">Send Test Alert</button>
+          </div>
+          <div id="webhookTestResult" style="margin-top:0.75rem;font-family:var(--mono);font-size:0.72rem;display:none"></div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -565,6 +731,9 @@ function showPage(name) {
   if (name === 'users')    loadUsers();
   if (name === 'capa')     loadCapaConfig();
   if (name === 'elastic')  loadElasticConfig();
+  if (name === 'splunk')   loadSplunkConfig();
+  if (name === 'misp')     loadMispConfig();
+  if (name === 'webhooks') loadWebhookConfig();
   if (name === 'settings') loadSettings();
 }
 
@@ -871,6 +1040,99 @@ async function saveSettings() {
   const r = await fetch('/api/settings', { method: 'PUT', headers, body: JSON.stringify(payload) });
   if (r.ok) toast('Settings saved');
   else toast('Failed to save', 'err');
+}
+
+
+// ═══════════════════════════════════════════════
+// SPLUNK
+// ═══════════════════════════════════════════════
+async function loadSplunkConfig() {
+  const r   = await fetch('/api/splunk/config', { headers });
+  const cfg = await r.json();
+  document.getElementById('splunkEnabled').checked  = cfg.enabled || false;
+  document.getElementById('splunkUrl').value        = cfg.hec_url || 'https://localhost:8088/services/collector/event';
+  document.getElementById('splunkIndex').value      = cfg.index || 'cti_hub';
+  document.getElementById('splunkVerifySSL').checked= cfg.verify_ssl || false;
+}
+
+async function saveSplunkConfig() {
+  const payload = {
+    enabled:    document.getElementById('splunkEnabled').checked,
+    hec_url:    document.getElementById('splunkUrl').value.trim(),
+    index:      document.getElementById('splunkIndex').value.trim(),
+    verify_ssl: document.getElementById('splunkVerifySSL').checked,
+  };
+  const token = document.getElementById('splunkToken').value.trim();
+  if (token) payload.hec_token = token;
+  const r = await fetch('/api/splunk/config', { method:'PUT', headers, body:JSON.stringify(payload) });
+  if (r.ok) toast('Splunk configuration saved');
+  else toast('Failed to save', 'err');
+}
+
+async function testSplunk() {
+  const result = document.getElementById('splunkTestResult');
+  result.style.display='block'; result.style.color='var(--text-mid)'; result.textContent='Testing...';
+  const r    = await fetch('/api/splunk/test', { method:'POST', headers });
+  const data = await r.json();
+  result.style.color = data.status==='ok' ? 'var(--success)' : 'var(--error)';
+  result.textContent = data.status==='ok' ? `✓ ${data.message}` : `✗ ${data.message}`;
+}
+
+// ═══════════════════════════════════════════════
+// MISP
+// ═══════════════════════════════════════════════
+async function loadMispConfig() {
+  const r   = await fetch('/api/misp/config', { headers });
+  const cfg = await r.json();
+  document.getElementById('mispEnabled').checked   = cfg.enabled || false;
+  document.getElementById('mispUrl').value         = cfg.url || 'https://localhost';
+  document.getElementById('mispVerifySSL').checked = cfg.verify_ssl || false;
+}
+
+async function saveMispConfig() {
+  const payload = {
+    enabled:    document.getElementById('mispEnabled').checked,
+    url:        document.getElementById('mispUrl').value.trim(),
+    verify_ssl: document.getElementById('mispVerifySSL').checked,
+  };
+  const key = document.getElementById('mispKey').value.trim();
+  if (key) payload.api_key = key;
+  const r = await fetch('/api/misp/config', { method:'PUT', headers, body:JSON.stringify(payload) });
+  if (r.ok) toast('MISP configuration saved');
+  else toast('Failed to save', 'err');
+}
+
+// ═══════════════════════════════════════════════
+// WEBHOOKS
+// ═══════════════════════════════════════════════
+async function loadWebhookConfig() {
+  const r   = await fetch('/api/webhooks/config', { headers });
+  const cfg = await r.json();
+  document.getElementById('webhookEnabled').checked  = cfg.enabled || false;
+  document.getElementById('webhookUrl').value        = cfg.url || '';
+  document.getElementById('webhookThreshold').value  = cfg.threshold || 0.7;
+  document.getElementById('webhookPlatform').value   = cfg.platform || 'slack';
+}
+
+async function saveWebhookConfig() {
+  const payload = {
+    enabled:   document.getElementById('webhookEnabled').checked,
+    url:       document.getElementById('webhookUrl').value.trim(),
+    threshold: parseFloat(document.getElementById('webhookThreshold').value),
+    platform:  document.getElementById('webhookPlatform').value,
+  };
+  const r = await fetch('/api/webhooks/config', { method:'PUT', headers, body:JSON.stringify(payload) });
+  if (r.ok) toast('Webhook configuration saved');
+  else toast('Failed to save', 'err');
+}
+
+async function testWebhook() {
+  const result = document.getElementById('webhookTestResult');
+  result.style.display='block'; result.style.color='var(--text-mid)'; result.textContent='Firing test webhook...';
+  const r    = await fetch('/api/webhooks/test', { method:'POST', headers });
+  const data = await r.json();
+  result.style.color = data.status==='ok' ? 'var(--success)' : 'var(--error)';
+  result.textContent = data.status==='ok' ? `✓ ${data.message}` : `✗ ${data.message}`;
 }
 
 function logout() {

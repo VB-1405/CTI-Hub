@@ -22,7 +22,7 @@ Docker:
     docker compose up -d
 """
 
-import os, json, time, hashlib, tempfile, subprocess, datetime, secrets
+import os, json, time, hashlib, tempfile, subprocess, datetime, secrets, sqlite3, threading
 from pathlib import Path
 from functools import wraps
 
@@ -41,6 +41,32 @@ CONFIG_FILE = BASE_DIR / 'config.json'
 USERS_FILE  = BASE_DIR / 'users.json'
 CACHE_DIR   = Path(os.environ.get('CAPA_CACHE', BASE_DIR / 'capa_cache'))
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
+DB_FILE     = BASE_DIR / 'scans.db'
+
+
+# ── SQLite scan history ───────────────────────────────────────────
+def init_db():
+    conn = sqlite3.connect(str(DB_FILE))
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS scans (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp     TEXT NOT NULL,
+            target        TEXT NOT NULL,
+            target_type   TEXT NOT NULL,
+            verdict       TEXT NOT NULL,
+            threat_score  REAL DEFAULT 0,
+            engines_total INTEGER DEFAULT 0,
+            engines_hit   INTEGER DEFAULT 0,
+            analyst       TEXT DEFAULT '',
+            results       TEXT DEFAULT '{}',
+            techniques    TEXT DEFAULT '[]',
+            notes         TEXT DEFAULT ''
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
 
 # ── JWT secret (generated once, persisted) ───────────────────────
 SECRET_FILE = BASE_DIR / '.jwt_secret'
@@ -154,6 +180,25 @@ DEFAULT_CONFIG = {
         "password": "",
         "index": "cti-scans",
         "verify_ssl": False
+    },
+    "splunk": {
+        "enabled": False,
+        "hec_url": "https://localhost:8088/services/collector/event",
+        "hec_token": "",
+        "index": "cti_hub",
+        "verify_ssl": False
+    },
+    "misp": {
+        "enabled": False,
+        "url": "https://localhost",
+        "api_key": "",
+        "verify_ssl": False
+    },
+    "webhooks": {
+        "enabled": False,
+        "url": "",
+        "threshold": 0.7,
+        "platform": "slack"
     },
     "settings": {
         "app_name": "CTI Hub",
@@ -1089,13 +1134,11 @@ def capa_file():
 @require_auth
 def elastic_scan():
     import urllib3; urllib3.disable_warnings()
-    cfg = load_config()
-    es  = cfg.get('elasticsearch',{})
-    if not es.get('enabled'):
-        return jsonify({'status':'skipped','message':'Elasticsearch shipping disabled'})
+    cfg     = load_config()
+    data    = request.json or {}
+    analyst = get_current_user().get('sub','unknown')
 
-    data = request.json or {}
-    doc  = {
+    doc = {
         '@timestamp':    datetime.datetime.utcnow().isoformat()+'Z',
         'target':        data.get('target',''),
         'target_type':   data.get('type',''),
@@ -1106,17 +1149,408 @@ def elastic_scan():
         'results':       data.get('results',{}),
         'techniques':    data.get('techniques',[]),
         'analyst_ip':    request.remote_addr,
-        'analyst':       get_current_user().get('sub','unknown'),
+        'analyst':       analyst,
     }
+
+    # ── 1. Always save to local SQLite ──────────────────────────
+    save_scan({**data, 'target': doc['target'], 'type': doc['target_type'],
+               'verdict': doc['verdict'], 'score': doc['threat_score'],
+               'engines_total': doc['engines_total'], 'engines_hit': doc['engines_hit'],
+               'results': doc['results'], 'techniques': doc['techniques']}, analyst)
+
+    # ── 2. Ship to Elasticsearch (optional) ─────────────────────
+    es     = cfg.get('elasticsearch',{})
+    es_id  = None
+    if es.get('enabled'):
+        try:
+            r     = requests.post(
+                f"{es['url']}/{es.get('index','cti-scans')}/_doc",
+                auth=(es.get('username','elastic'), es.get('password','')),
+                json=doc, verify=es.get('verify_ssl',False), timeout=5
+            )
+            es_id = r.json().get('_id')
+        except Exception as ex:
+            print(f'[elastic] error: {ex}')
+
+    # ── 3. Ship to Splunk HEC (optional) ────────────────────────
+    ship_to_splunk(doc)
+
+    # ── 4. Fire webhook if threshold exceeded ───────────────────
+    _fire_webhook(doc)
+
+    return jsonify({'status':'ok','es_id':es_id,'saved':True})
+
+
+
+# ══════════════════════════════════════════════════════════════════
+#  SCAN HISTORY (SQLite)
+# ══════════════════════════════════════════════════════════════════
+
+def save_scan(data: dict, analyst: str):
+    """Persist a scan result to SQLite."""
+    try:
+        conn = sqlite3.connect(str(DB_FILE))
+        conn.execute(
+            """INSERT INTO scans
+               (timestamp,target,target_type,verdict,threat_score,
+                engines_total,engines_hit,analyst,results,techniques)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (
+                datetime.datetime.utcnow().isoformat()+'Z',
+                data.get('target',''),
+                data.get('type',''),
+                data.get('verdict','UNKNOWN'),
+                data.get('score', 0),
+                data.get('engines_total', 0),
+                data.get('engines_hit', 0),
+                analyst,
+                json.dumps(data.get('results', {})),
+                json.dumps(data.get('techniques', [])),
+            )
+        )
+        conn.commit()
+        conn.close()
+    except Exception as ex:
+        print(f'[scan history] save error: {ex}')
+
+
+@app.route('/api/history', methods=['GET'])
+@require_auth
+def get_history():
+    limit  = min(int(request.args.get('limit', 50)), 200)
+    offset = int(request.args.get('offset', 0))
+    search = request.args.get('q', '').strip()
+    conn   = sqlite3.connect(str(DB_FILE))
+    conn.row_factory = sqlite3.Row
+
+    if search:
+        rows = conn.execute(
+            "SELECT * FROM scans WHERE target LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?",
+            (f'%{search}%', limit, offset)
+        ).fetchall()
+        total = conn.execute(
+            "SELECT COUNT(*) FROM scans WHERE target LIKE ?", (f'%{search}%',)
+        ).fetchone()[0]
+    else:
+        rows = conn.execute(
+            "SELECT * FROM scans ORDER BY id DESC LIMIT ? OFFSET ?",
+            (limit, offset)
+        ).fetchall()
+        total = conn.execute("SELECT COUNT(*) FROM scans").fetchone()[0]
+
+    conn.close()
+    return jsonify({
+        'total': total,
+        'scans': [dict(r) for r in rows]
+    })
+
+
+@app.route('/api/history/<int:scan_id>', methods=['GET'])
+@require_auth
+def get_scan(scan_id):
+    conn = sqlite3.connect(str(DB_FILE))
+    conn.row_factory = sqlite3.Row
+    row  = conn.execute("SELECT * FROM scans WHERE id=?", (scan_id,)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({'error': 'Scan not found'}), 404
+    d = dict(row)
+    d['results']    = json.loads(d['results'])
+    d['techniques'] = json.loads(d['techniques'])
+    return jsonify(d)
+
+
+@app.route('/api/history/<int:scan_id>/notes', methods=['PUT'])
+@require_auth
+def update_notes(scan_id):
+    notes = (request.json or {}).get('notes', '')
+    conn  = sqlite3.connect(str(DB_FILE))
+    conn.execute("UPDATE scans SET notes=? WHERE id=?", (notes, scan_id))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/history/<int:scan_id>', methods=['DELETE'])
+@require_admin
+def delete_scan(scan_id):
+    conn = sqlite3.connect(str(DB_FILE))
+    conn.execute("DELETE FROM scans WHERE id=?", (scan_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/history/stats', methods=['GET'])
+@require_auth
+def history_stats():
+    conn = sqlite3.connect(str(DB_FILE))
+    total    = conn.execute("SELECT COUNT(*) FROM scans").fetchone()[0]
+    malicious= conn.execute("SELECT COUNT(*) FROM scans WHERE verdict='MALICIOUS'").fetchone()[0]
+    suspicious=conn.execute("SELECT COUNT(*) FROM scans WHERE verdict='SUSPICIOUS'").fetchone()[0]
+    clean    = conn.execute("SELECT COUNT(*) FROM scans WHERE verdict='CLEAN'").fetchone()[0]
+    avg_score= conn.execute("SELECT AVG(threat_score) FROM scans").fetchone()[0] or 0
+    conn.close()
+    return jsonify({
+        'total': total, 'malicious': malicious,
+        'suspicious': suspicious, 'clean': clean,
+        'avg_score': round(avg_score, 3)
+    })
+
+
+# ══════════════════════════════════════════════════════════════════
+#  SPLUNK HEC SHIPPING
+# ══════════════════════════════════════════════════════════════════
+
+@app.route('/api/splunk/config', methods=['GET'])
+@require_admin
+def get_splunk_config():
+    cfg = load_config()
+    sp  = cfg.get('splunk', {})
+    safe = {k: v for k, v in sp.items() if k != 'hec_token'}
+    safe['has_token'] = bool(sp.get('hec_token'))
+    return jsonify(safe)
+
+
+@app.route('/api/splunk/config', methods=['PUT'])
+@require_admin
+def update_splunk_config():
+    data = request.json or {}
+    cfg  = load_config()
+    sp   = cfg.get('splunk', {})
+    for key in ['enabled', 'hec_url', 'index', 'verify_ssl']:
+        if key in data: sp[key] = data[key]
+    if data.get('hec_token'): sp['hec_token'] = data['hec_token']
+    cfg['splunk'] = sp
+    save_config(cfg)
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/splunk/test', methods=['POST'])
+@require_admin
+def test_splunk():
+    cfg = load_config()
+    sp  = cfg.get('splunk', {})
+    if not sp.get('hec_token'):
+        return jsonify({'status': 'error', 'message': 'No HEC token configured'})
     try:
         r = requests.post(
-            f"{es['url']}/{es.get('index','cti-scans')}/_doc",
-            auth=(es.get('username','elastic'), es.get('password','')),
-            json=doc, verify=es.get('verify_ssl',False), timeout=5
+            sp.get('hec_url', 'http://localhost:8088/services/collector/event'),
+            headers={'Authorization': f"Splunk {sp['hec_token']}"},
+            json={'event': {'test': 'CTI Hub connection test', 'source': 'cti_hub'}, 'index': sp.get('index','cti_hub')},
+            verify=sp.get('verify_ssl', False), timeout=5
         )
-        return jsonify({'status':'ok','es_id':r.json().get('_id')})
+        if r.status_code == 200:
+            return jsonify({'status': 'ok', 'message': 'Splunk HEC connection successful'})
+        return jsonify({'status': 'error', 'message': f'HTTP {r.status_code}: {r.text[:100]}'})
     except Exception as ex:
-        return jsonify({'status':'error','detail':str(ex)})
+        return jsonify({'status': 'error', 'message': str(ex)[:100]})
+
+
+def ship_to_splunk(doc: dict):
+    """Fire-and-forget Splunk HEC shipping."""
+    def _send():
+        try:
+            cfg = load_config()
+            sp  = cfg.get('splunk', {})
+            if not sp.get('enabled') or not sp.get('hec_token'): return
+            requests.post(
+                sp.get('hec_url','http://localhost:8088/services/collector/event'),
+                headers={'Authorization': f"Splunk {sp['hec_token']}"},
+                json={
+                    'time':       time.time(),
+                    'sourcetype': 'cti_hub',
+                    'index':      sp.get('index','cti_hub'),
+                    'source':     'cti-hub',
+                    'event':      doc
+                },
+                verify=sp.get('verify_ssl',False), timeout=5
+            )
+        except Exception: pass
+    threading.Thread(target=_send, daemon=True).start()
+
+
+# ══════════════════════════════════════════════════════════════════
+#  MISP ENGINE
+# ══════════════════════════════════════════════════════════════════
+
+@app.route('/api/misp/config', methods=['GET'])
+@require_admin
+def get_misp_config():
+    cfg = load_config()
+    m   = cfg.get('misp', {})
+    safe = {k: v for k, v in m.items() if k != 'api_key'}
+    safe['has_key'] = bool(m.get('api_key'))
+    return jsonify(safe)
+
+
+@app.route('/api/misp/config', methods=['PUT'])
+@require_admin
+def update_misp_config():
+    data = request.json or {}
+    cfg  = load_config()
+    m    = cfg.get('misp', {})
+    for key in ['enabled', 'url', 'verify_ssl']:
+        if key in data: m[key] = data[key]
+    if data.get('api_key'): m['api_key'] = data['api_key']
+    cfg['misp'] = m
+    save_config(cfg)
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/misp')
+@require_auth
+def misp_route():
+    cfg = load_config()
+    m   = cfg.get('misp', {})
+    if not m.get('enabled'):
+        return jsonify({'status':'error','rows':[['MISP','Disabled — enable in Admin → Integrations']]})
+    if not m.get('api_key'):
+        return jsonify({'status':'error','rows':[['MISP','No API key configured']]})
+
+    value = request.args.get('value','')
+    typ   = request.args.get('type','')
+
+    try:
+        # Search MISP for the IOC
+        r = requests.post(
+            f"{m['url'].rstrip('/')}/attributes/restSearch",
+            headers={
+                'Authorization': m['api_key'],
+                'Accept':        'application/json',
+                'Content-Type':  'application/json',
+            },
+            json={'returnFormat':'json','value':value,'limit':10},
+            verify=m.get('verify_ssl',False), timeout=10
+        )
+        if r.status_code == 401:
+            return jsonify({'status':'error','rows':[['Error','Invalid MISP API key']]})
+        r.raise_for_status()
+
+        attrs  = r.json().get('response',{}).get('Attribute',[])
+        events = list({a.get('event_id') for a in attrs if a.get('event_id')})
+
+        if not attrs:
+            return jsonify({'status':'clean','rows':[['Result','Not found in MISP']],'score':0.0})
+
+        score = min(1.0, 0.4 + 0.1*len(attrs))
+        rows  = [
+            ['Attributes', str(len(attrs)), 'red'],
+            ['Events',     str(len(events)), 'warn' if events else ''],
+            ['Categories', ', '.join({a.get('category','') for a in attrs[:5]})[:50]],
+            ['Types',      ', '.join({a.get('type','') for a in attrs[:5]})[:50]],
+        ]
+        if attrs[0].get('comment'):
+            rows.append(['Comment', attrs[0]['comment'][:50]])
+
+        return jsonify({
+            'status': 'malicious',
+            'rows':   rows,
+            'score':  score,
+            'link':   f"{m['url'].rstrip('/')}/events/index"
+        })
+    except Exception as ex:
+        return jsonify({'status':'error','rows':[['Error',str(ex)[:80]]]})
+
+
+# ══════════════════════════════════════════════════════════════════
+#  WEBHOOK ALERTS
+# ══════════════════════════════════════════════════════════════════
+
+@app.route('/api/webhooks/config', methods=['GET'])
+@require_admin
+def get_webhook_config():
+    cfg = load_config()
+    return jsonify(cfg.get('webhooks', {}))
+
+
+@app.route('/api/webhooks/config', methods=['PUT'])
+@require_admin
+def update_webhook_config():
+    data = request.json or {}
+    cfg  = load_config()
+    wh   = cfg.get('webhooks', {})
+    for key in ['enabled','url','threshold','platform']:
+        if key in data: wh[key] = data[key]
+    cfg['webhooks'] = wh
+    save_config(cfg)
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/webhooks/test', methods=['POST'])
+@require_admin
+def test_webhook():
+    cfg = load_config()
+    wh  = cfg.get('webhooks', {})
+    if not wh.get('url'):
+        return jsonify({'status':'error','message':'No webhook URL configured'})
+    try:
+        _fire_webhook({
+            'target':'test-connection','verdict':'TEST',
+            'threat_score':0,'target_type':'ip'
+        }, test=True)
+        return jsonify({'status':'ok','message':'Test webhook fired'})
+    except Exception as ex:
+        return jsonify({'status':'error','message':str(ex)[:100]})
+
+
+def _fire_webhook(doc: dict, test: bool = False):
+    """Fire Slack/Discord/Teams webhook in a background thread."""
+    def _send():
+        try:
+            cfg       = load_config()
+            wh        = cfg.get('webhooks', {})
+            url       = wh.get('url','')
+            platform  = wh.get('platform','slack')
+            threshold = float(wh.get('threshold', 0.7))
+
+            if not url: return
+            if not test and doc.get('threat_score', 0) < threshold: return
+
+            verdict = doc.get('verdict','UNKNOWN')
+            target  = doc.get('target','')
+            score   = doc.get('threat_score', 0)
+            emoji   = '🔴' if verdict=='MALICIOUS' else '🟡' if verdict=='SUSPICIOUS' else '🟢'
+
+            if platform in ('slack', 'discord'):
+                # Both Slack and Discord support this format
+                payload = {
+                    'text': f'{emoji} *CTI Hub Alert* — {verdict}',
+                    'attachments': [{
+                        'color':  '#ff4757' if verdict=='MALICIOUS' else '#ffa502',
+                        'fields': [
+                            {'title':'Target',      'value':target[:80],               'short':True},
+                            {'title':'Verdict',     'value':verdict,                   'short':True},
+                            {'title':'Threat Score','value':f'{round(score*100)}%',    'short':True},
+                            {'title':'Type',        'value':doc.get('target_type',''), 'short':True},
+                        ],
+                        'footer': 'CTI Hub',
+                        'ts':     int(time.time()),
+                    }]
+                }
+            elif platform == 'teams':
+                payload = {
+                    '@type':      'MessageCard',
+                    '@context':   'http://schema.org/extensions',
+                    'themeColor': 'ff4757' if verdict=='MALICIOUS' else 'ffa502',
+                    'summary':    f'CTI Hub — {verdict} detected',
+                    'sections': [{
+                        'activityTitle': f'{emoji} CTI Hub Alert — {verdict}',
+                        'facts': [
+                            {'name':'Target',       'value':target[:80]},
+                            {'name':'Threat Score', 'value':f'{round(score*100)}%'},
+                            {'name':'Type',         'value':doc.get('target_type','')},
+                        ]
+                    }]
+                }
+            else:
+                payload = {'text': f'{emoji} CTI Hub: {verdict} — {target} ({round(score*100)}%)'}
+
+            requests.post(url, json=payload, timeout=5)
+        except Exception as ex:
+            print(f'[webhook] error: {ex}')
+
+    threading.Thread(target=_send, daemon=True).start()
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -1136,11 +1570,14 @@ def health():
             pass
     return jsonify({
         'status':      'ok',
-        'version':     '2.0.0',
+        'version':     '2.1.0',
         'setup_done':  len(users) > 0,
         'engines':     sum(1 for e in cfg.get('engines',[]) if e.get('enabled')),
         'capa':        'available' if capa_ok else ('disabled' if not capa_cfg.get('enabled') else 'not found'),
         'elastic':     'enabled' if cfg.get('elasticsearch',{}).get('enabled') else 'disabled',
+        'splunk':      'enabled' if cfg.get('splunk',{}).get('enabled') else 'disabled',
+        'misp':        'enabled' if cfg.get('misp',{}).get('enabled') else 'disabled',
+        'webhooks':    'enabled' if cfg.get('webhooks',{}).get('enabled') else 'disabled',
     })
 
 
@@ -1151,6 +1588,10 @@ def health():
 @app.route('/')
 def index():
     return send_from_directory('static', 'index.html')
+
+@app.route('/history')
+def history_page():
+    return send_from_directory('static', 'history.html')
 
 @app.route('/login')
 def login_page():
@@ -1167,7 +1608,7 @@ def setup_page():
 
 if __name__ == '__main__':
     print("=" * 55)
-    print("  CTI Hub v2.0 — Starting")
+    print("  CTI Hub v2.1 — Starting")
     print("=" * 55)
     users = load_users()
     if not users:
