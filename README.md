@@ -2,6 +2,8 @@
 
 A self-hosted, open-source threat intelligence aggregator that queries multiple CTI engines in parallel and correlates results into a unified verdict. Designed to integrate with any SIEM tool — Elastic Stack, Splunk, or MISP.
 
+<img width="1440" height="680" alt="Screenshot 2026-06-02 at 4 01 01 PM" src="https://github.com/user-attachments/assets/57b70771-3e50-43ae-9186-c9c124440cc0" />
+
 ---
 
 ## Features
